@@ -1,5 +1,10 @@
 # routing/views.py
 from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+
+@login_required
 def map_view(request):
     return render(request, 'routing/map.html') 
 
@@ -22,6 +27,8 @@ target_idx = 0
 target_mean = mean_vals[target_idx]
 target_std = std_vals[target_idx]
 
+@login_required
+@method_decorator(csrf_exempt, name='dispatch')
 class RoutingView(APIView):
     def post(self, request, format=None):
         # Obtener origen y destino
@@ -144,3 +151,26 @@ class RoutingView(APIView):
             "route": route_geojson,
             "prediccion": pred_time
         })
+
+@csrf_exempt
+def login_view(request):
+    if request.method == "POST":
+        username = request.POST["username"]
+        password = request.POST["password"]
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+            login(request, user)
+            return redirect('/api/map/')  # Redirige a mapa.html tras login exitoso
+        else:
+            return render(request, "login.html", {"error": "Usuario o contraseña incorrectos"})
+
+    return render(request, "routing/login.html")
+@csrf_exempt
+def logout_view(request):
+    logout(request)
+    return redirect("login")  # Redirige a login tras salir
+@login_required
+@csrf_exempt
+def blank_view(request):
+    return render(request, "routing/blank.html")  # Django buscará en "routing/templates/"

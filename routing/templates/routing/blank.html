@@ -1,0 +1,302 @@
+{% if user.is_authenticated %}
+{% load static %}
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard LSTM Map</title>
+    
+    <!-- BOOTSTRAP STYLES -->
+    <link href="{% static 'assets/css/bootstrap.css' %}" rel="stylesheet" />
+    <!-- FONTAWESOME STYLES -->
+    <link href="{% static 'assets/css/font-awesome.css' %}" rel="stylesheet" />
+    <!-- CUSTOM STYLES -->
+    <link href="{% static 'assets/css/custom.css' %}" rel="stylesheet" />
+    <!-- GOOGLE FONTS -->
+    <link href="http://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      #map { width: 100%; height: 500px; margin-top: 20px; }
+      .form-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+      }
+      .form-group { display: flex; flex-direction: column; }
+      .form-group label { margin-bottom: 5px; font-size: 0.9em; }
+      .form-group input, .form-group select { padding: 5px; width: 140px; }
+      button { padding: 10px 15px; margin-top: 10px; }
+      #sequenceDisplay { background: #f0f0f0; padding: 10px; display: none; }
+      /* Estilos para el control personalizado */
+      .pred-control {
+        background: rgba(255, 255, 255, 0.8);
+        padding: 8px 12px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 4px;
+      }
+    </style>
+    
+</head>
+<body>
+    <div id="wrapper">
+        <nav class="navbar navbar-default navbar-cls-top " role="navigation" style="margin-bottom: 0">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".sidebar-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="{% url 'route' %}">LSTM-Routing</a> 
+            </div>
+            <div style="color: white; padding: 15px 50px 5px 50px; float: right; font-size: 16px;">
+                Last access : 7 Marzo 2025 &nbsp; 
+                <a href="{% url 'logout' %}" class="btn btn-danger square-btn-adjust">Logout</a>
+            </div>
+        </nav>   
+        <!-- /. NAV TOP  -->
+        <nav class="navbar-default navbar-side" role="navigation">
+            <div class="sidebar-collapse">
+                <ul class="nav" id="main-menu">
+                    <li class="text-center">
+                        <img src="{% static 'assets/img/find_user.png' %}" class="user-image img-responsive"/>
+                    </li>
+                    <li>
+                        <a href="{% url 'route' %}"><i class="fa fa-dashboard fa-3x"></i> Dashboard</a>
+                    </li>
+                    <li>
+                        <a href="{% static 'ui.html' %}"><i class="fa fa-desktop fa-3x"></i> UI Elements</a>
+                    </li>
+                    <li>
+                        <a href="{% static 'tab-panel.html' %}"><i class="fa fa-qrcode fa-3x"></i> Tabs & Panels</a>
+                    </li>
+                    <li>
+                        <a href="{% static 'chart.html' %}"><i class="fa fa-bar-chart-o fa-3x"></i> Morris Charts</a>
+                    </li>    
+                    <li>
+                        <a href="{% static 'table.html' %}"><i class="fa fa-table fa-3x"></i> Table Examples</a>
+                    </li>
+                    <li>
+                        <a href="{% static 'form.html' %}"><i class="fa fa-edit fa-3x"></i> Forms </a>
+                    </li>                
+                    <li>
+                        <a class="active-menu" href="{% url 'blank' %}"><i class="fa fa-square-o fa-3x"></i> IA Routing</a>
+                    </li>    
+                </ul>
+            </div>
+        </nav>  
+        <!-- /. NAV SIDE  -->
+        <div id="page-wrapper">
+            <div id="page-inner">
+                <div class="row">
+                    <div class="col-md-12">
+                        <!-- <h5>Welcome {{ request.user.username }}, love to see you back. </h5> -->
+                        <h2>Bienvenido, {{ user.username }}</h2>
+                        <h2>Ingrese Parámetros del Intervalo</h2>
+                        <form id="paramForm">
+                          {% csrf_token %}
+                          <div class="form-container">
+                            <div class="form-group">
+                              <label for="speed">Velocidad (km/h):</label>
+                              <input type="number" step="any" id="speed" name="speed" value="40.0" required>
+                            </div>
+                            <div class="form-group">
+                              <label for="fecha">Fecha:</label>
+                              <input type="date" id="fecha" name="fecha" required>
+                            </div>
+                            <div class="form-group">
+                              <label for="hora">Hora:</label>
+                              <input type="time" id="hora" name="hora" required>
+                            </div>
+                            <div class="form-group">
+                              <label for="is_holiday">¿Feriado?</label>
+                              <input type="checkbox" id="is_holiday" name="is_holiday">
+                            </div>
+                            <div class="form-group">
+                              <label for="avg_temp">Temperatura (°C):</label>
+                              <input type="number" step="any" id="avg_temp" name="avg_temp" value="30" required>
+                            </div>
+                            <div class="form-group">
+                              <label for="precipitation">Precipitación (%):</label>
+                              <input type="number" step="any" id="precipitation" name="precipitation" value="10" required>
+                            </div>
+                            <button type="submit">Configurar Intervalo</button>
+                          </div>
+                        </form>
+                        
+                        <hr>
+                        <h2>Selecciona Origen y Destino en el Mapa</h2>
+                        <div id="map"></div>
+                        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+                        <script>
+                          // Variable global para almacenar la secuencia (se replicará 12 veces)
+                          var sequence = null;
+                      
+                          // Función para codificación cíclica (si es necesario)
+                          function cyclicEncode(value, period) {
+                            var radians = 2 * Math.PI * value / period;
+                            return [Math.sin(radians), Math.cos(radians)];
+                          }
+                      
+                          // Al enviar el formulario, se obtienen los valores y se replica 12 veces
+                          document.getElementById("paramForm").addEventListener("submit", function(e) {
+                            e.preventDefault();
+                            var speed = parseFloat(document.getElementById("speed").value);
+                            var fecha = document.getElementById("fecha").value;
+                            var hora = document.getElementById("hora").value;
+                            var isHoliday = document.getElementById("is_holiday").checked ? 1 : 0;
+                            var avgTemp = parseFloat(document.getElementById("avg_temp").value);
+                            var precipPercent = parseFloat(document.getElementById("precipitation").value);
+                            var precipitation = precipPercent / 100;
+                            
+                            var dateTime = new Date(fecha + "T" + hora);
+                            if (isNaN(dateTime.getTime())) {
+                              alert("Fecha u hora inválida.");
+                              return;
+                            }
+                            
+                            var dayOfWeek = dateTime.getDay();
+                            var hourOfDay = dateTime.getHours() + dateTime.getMinutes()/60;
+                            var startOfYear = new Date(dateTime.getFullYear(), 0, 1);
+                            var dayOfYear = Math.floor((dateTime - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
+                            
+                            // Calcular codificación cíclica
+                            var [dayWeekSin, dayWeekCos] = [Math.sin(2*Math.PI*dayOfWeek/7), Math.cos(2*Math.PI*dayOfWeek/7)];
+                            var [hourSin, hourCos] = [Math.sin(2*Math.PI*hourOfDay/24), Math.cos(2*Math.PI*hourOfDay/24)];
+                            var [dayYearSin, dayYearCos] = [Math.sin(2*Math.PI*dayOfYear/365), Math.cos(2*Math.PI*dayOfYear/365)];
+                            
+                            // Valor fijo para travel_time_log (objetivo)
+                            var travel_time_log = 5.1;
+                            
+                            // Vector de 11 features
+                            var intervalData = [
+                              travel_time_log, 
+                              speed, 
+                              dayWeekSin, 
+                              dayWeekCos, 
+                              hourSin, 
+                              hourCos, 
+                              dayYearSin, 
+                              dayYearCos, 
+                              isHoliday, 
+                              avgTemp, 
+                              precipitation
+                            ];
+                            
+                            // Replicar el mismo intervalo 12 veces
+                            sequence = [];
+                            for (var i = 0; i < 12; i++) {
+                              sequence.push(intervalData);
+                            }
+                            alert("Secuencia configurada automáticamente (12 intervalos).");
+                          });
+                      
+                          // Inicializa el mapa
+                          var map = L.map('map').setView([40.755, -73.985], 13);
+                          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                      
+                          var origen = null, destino = null;
+                          var markers = [];
+                          var routeLayer = null;
+                      
+                          // Crear un control personalizado para mostrar la predicción en la esquina superior izquierda
+                          var predControl = L.control({position: 'topright'});
+                          predControl.onAdd = function(map) {
+                            var div = L.DomUtil.create('div', 'pred-control');
+                            div.innerHTML = "Tiempo estimado: --";
+                            return div;
+                          };
+                          predControl.addTo(map);
+                      
+                          // Función para actualizar el control de predicción
+                          function updatePrediction(value) {
+                            var div = document.querySelector('.pred-control');
+                            var minutos = (value / 60).toFixed(2);
+                            div.innerHTML = "Tiempo estimado: " + minutos + " minutos";
+                          }
+                      
+                          function resetSelection() {
+                            origen = null;
+                            destino = null;
+                            markers.forEach(function(m) { map.removeLayer(m); });
+                            markers = [];
+                            if (routeLayer) {
+                              map.removeLayer(routeLayer);
+                              routeLayer = null;
+                            }
+                            updatePrediction(0);
+                          }
+                      
+                          map.on('click', function(e) {
+                            if (!origen) {
+                              origen = e.latlng;
+                              markers.push(L.marker(origen).addTo(map));
+                            } else if (!destino) {
+                              destino = e.latlng;
+                              markers.push(L.marker(destino).addTo(map));
+                              if (!sequence || sequence.length !== 12) {
+                                alert("Debe configurar primero los datos del intervalo.");
+                                resetSelection();
+                                return;
+                              }
+                              var payload = {
+                                origen: { lat: origen.lat, lng: origen.lng },
+                                destino: { lat: destino.lat, lng: destino.lng },
+                                features: sequence
+                              };
+                              fetch('/api/route/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                              })
+                              .then(response => response.json())
+                              .then(data => {
+                                console.log("Respuesta de la API:", data);
+                                if (routeLayer) { map.removeLayer(routeLayer); }
+                                routeLayer = L.geoJSON(data.route).addTo(map);
+                                if (data.prediccion) {
+                                  updatePrediction(data.prediccion);
+                                }
+                              })
+                              .catch(err => {
+                                console.error("Error en la API:", err);
+                                resetSelection();
+                              });
+                            } else {
+                              resetSelection();
+                            }
+                          });
+                        </script>
+
+                    </div>
+                </div>
+                 <!-- /. ROW  -->
+                 <hr />
+            </div>
+            <!-- /. PAGE INNER  -->
+        </div>
+        <!-- /. PAGE WRAPPER  -->
+    </div>
+    <!-- /. WRAPPER  -->
+    
+    <!-- SCRIPTS - AT THE BOTTOM TO REDUCE THE LOAD TIME -->
+    <!-- JQUERY SCRIPTS -->
+    <script src="{% static 'assets/js/jquery-1.10.2.js' %}"></script>
+    <!-- BOOTSTRAP SCRIPTS -->
+    <script src="{% static 'assets/js/bootstrap.min.js' %}"></script>
+    <!-- METISMENU SCRIPTS -->
+    <script src="{% static 'assets/js/jquery.metisMenu.js' %}"></script>
+    <!-- CUSTOM SCRIPTS -->
+    <script src="{% static 'assets/js/custom.js' %}"></script>
+</body>
+
+{% else %}
+<script>
+window.location.href = "/login/";
+</script>
+{% endif %}
+</html>

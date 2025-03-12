@@ -1,3 +1,4 @@
+{% if user.is_authenticated %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -28,7 +29,11 @@
     }
   </style>
 </head>
+
+
 <body>
+  <h2>Bienvenido, {{ user.username }}</h2>
+  <a href="{% url 'logout' %}">Cerrar sesión</a>
   <h2>Ingrese Parámetros del Intervalo</h2>
   <form id="paramForm">
     <div class="form-container">
@@ -205,4 +210,12 @@
     });
   </script>
 </body>
+</html>
+{% else %}
+<script>
+  window.location.href = "/login/";
+</script>
+{% endif %}
+
+ 
 </html>
